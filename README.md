@@ -10,7 +10,7 @@ Leverage Citi Bike trip data and NYPD collision data to create value and explore
 
 ## Data Sources
 
--CitiBike Trip Data: https://s3.amazonaws.com/tripdata/index.html
+- CitiBike Trip Data: https://s3.amazonaws.com/tripdata/index.html
 
 - NYPD Motor Vehicle Collisions: https://data.cityofnewyork.us/Public-Safety/Motor-Vehicle-Collisions-Crashes/h9gi-nx95/about\_data
 

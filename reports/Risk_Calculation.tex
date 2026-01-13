@@ -1,0 +1,251 @@
+\documentclass[11pt]{article}
+
+\usepackage[utf8]{inputenc} % usually default in Overleaf, but safe
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath, amssymb}
+\usepackage{geometry}
+\usepackage{url}
+\geometry{margin=1in}
+
+\title{Dynamic Accident Risk Model for Citi Bike Trips in NYC}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Goal}
+We build a \textbf{dynamic risk model} that outputs the probability (in \%) that a Citi Bike trip results
+in an accident, conditional on the rider starting at a specific station and the current time. This
+estimate can be used to derive a \textbf{dynamic per-trip health insurance price}.
+
+\section{Notation}
+\begin{itemize}
+    \item $S$: set of all stations.
+    \item $s \in S$: a station.
+    \item $s_{\mathrm{cur}} \in S$: current (start) station.
+    \item $s_{\mathrm{dest}} \in S$: destination station.
+    \item $r$: a (random) trip.
+    \item $r_{s_1 \to s_2}$: trip starting at $s_1$ and ending at $s_2$.
+    \item $t_r$: time window associated with trip $r$ (e.g.\ start time or start-to-end interval).
+    \item We write $P(\cdot)$ for probabilities of events. For continuous variables, we write $f(\cdot)$ for probability density functions (pdfs).
+\end{itemize}
+
+\section{Model decomposition}
+For a fixed start station $s_{\mathrm{cur}}$:
+\begin{align}
+P(\mathrm{accident} \mid s_{\mathrm{cur}})
+&= \sum_{s_{\mathrm{dest}} \in S \setminus \{s_{\mathrm{cur}}\}}
+P\!\big(\mathrm{accident}, r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}} \,\big|\, s_{\mathrm{cur}}\big) \\
+&= \sum_{s_{\mathrm{dest}} \in S \setminus \{s_{\mathrm{cur}}\}}
+P\!\big(r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}} \mid s_{\mathrm{cur}}\big)\,
+P\!\big(\mathrm{accident} \mid r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}}\big).
+\end{align}
+The second line follows from the \textbf{law of total probability} and the product rule.
+
+This yields two subproblems:
+\begin{enumerate}
+    \item Destination choice:
+    \[
+    P\!\big(r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}} \mid s_{\mathrm{cur}}\big).
+    \]
+    \item Conditional trip risk:
+    \[
+    P\!\big(\mathrm{accident} \mid r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}}\big).
+    \]
+\end{enumerate}
+
+\section{Destination choice}
+\paragraph{Reference.} Notebook \verb|03_citibike_FE_Modelling| (trained for a fixed $s_{\mathrm{cur}}$).
+\[
+P\!\big(r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}} \mid s_{\mathrm{cur}}\big).
+\]
+
+We model the destination distribution with a probabilistic classifier (multinomial logistic regression), producing predicted probabilities for each candidate destination.
+
+\paragraph{Issue: class explosion.}
+The number of possible destination stations is large (on the order of $\sim 2000$), which makes a direct multi-class formulation noisy and data-inefficient.
+
+\paragraph{Mitigation.}
+We restrict the target space to the $k$ most frequent destination stations (calculated for each $s_{\mathrm{cur}}$ individually) and collapse all remaining stations into a single ``Other'' class:
+\[
+\mathcal{C} = \{s^{(1)}, \dots, s^{(k)}, \mathrm{Other}\}.
+\]
+
+\section{Conditional trip risk}
+We approximate the conditional accident probability as a ratio of expected accident count to expected rider count on the route during the relevant time window:
+\begin{equation}
+P(\mathrm{accident} \mid r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}})
+\approx
+\frac{\mathbb{E}\!\left[N_{\mathrm{acc}}\!\left(r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}}\right)\right]}
+{\mathbb{E}\!\left[N_{\mathrm{riders}}\!\left(r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}}\right)\right]}.
+\end{equation}
+
+\subsection{Expected accident count on a route}
+We decompose the expected accident count into (notation: $r=r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}}$):
+\begin{equation}
+\mathbb{E}\!\left[N_{\mathrm{acc}}\!\left(r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}}\right)\right]
+=
+N_{\mathrm{acc,day}}\!\big(d(t_r)\big)
+\cdot
+\int_{\mathcal{R}(x_r,t_r)} f_{\mathrm{acc}}(x,\tau)\,dx\,d\tau,
+\end{equation}
+where $d(t_r)$ is the calendar day of the trip window, $x=(\mathrm{lat},\mathrm{lng})$ is location, $\tau$ is time-of-day, and $\mathcal{R}(x_r,t_r)$ denotes the spatio-temporal ``tube'' of the trip.
+
+\subsubsection{Daily accident volume}
+\paragraph{Reference.} \verb|MV_Collision| notebook.
+\[
+N_{\mathrm{acc,day}}(d).
+\]
+We predict the total number of accidents per day using regression models (Linear Regression, XGBoost, Random Forest) and a boosted hybrid approach (linear model + XGBoost on residuals).
+
+\subsubsection{Spatio-temporal accident intensity}
+\[
+f_{\mathrm{acc}}(x,\tau).
+\]
+We model accident intensity over location and time-of-day via a \textbf{mixture of Gaussians (MoG)} fitted to all accidents with injured cyclists aggregated by $(\mathrm{lat},\mathrm{lng},\tau)$.
+
+\paragraph{Model assumption.} The accident distribution in New York only depends on time of day.
+
+\subsection{Expected rider count on a route}
+Analogously:
+\begin{equation}
+\mathbb{E}\!\left[N_{\mathrm{riders}}\!\left(r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}}\right)\right]
+=
+\bar{N}_{\mathrm{riders,NYC}}(t_r)
+\cdot
+\int_{\mathcal{R}(x_r)} f_{\mathrm{riders}}(x)\,dx.
+\end{equation}
+
+\paragraph{Model assumption.} We assume that the traffic distribution is stationary for easier modelling.
+
+\subsubsection{Citywide rider volume}
+We approximate citywide rider volume by the number of active Citi Bike rides at time of the trip start, scaled by a constant factor (there are bicycle riders which aren't riding Citi Bikes). Since the average ride duration is short ($T \approx 12$ minutes), the scaled active rider count is a reasonable proxy:
+\[
+\bar{N}_{\mathrm{riders}}(t_r)
+\approx
+N_{\mathrm{citibike\_riders}}(t_{\mathrm{start}})\cdot c_{\mathrm{scaling}}.
+\]
+We estimate the scaling constant $c$ as
+\[
+c
+= \frac{\text{Total bicycle rides in New York City in 2025}}
+{\text{Total Citi Bike trips in New York City in 2025}} \, ,
+\]
+using Citi Bike data and NYC bicycle statistics (\url{https://www.nyc.gov/html/dot/html/bicyclists/bikestats.shtml}).
+
+\subsubsection{Spatio-temporal rider intensity}
+For each trip we map start and end coordinates on the map and fit a \textbf{mixture of Gaussians (MoG)} to obtain a normalized rider density:
+\[
+f_{\mathrm{riders}}(x).
+\]
+
+\subsection{Approximating Conditional trip risk}
+\begin{equation}
+P(\mathrm{accident} \mid r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}})
+\approx
+\frac{\mathbb{E}\!\left[N_{\mathrm{acc}}\!\left(r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}}\right)\right]}
+{\mathbb{E}\!\left[N_{\mathrm{riders}}\!\left(r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}}\right)\right]}.
+\end{equation}
+\begin{equation}
+\approx
+\frac{
+N_{\mathrm{acc,day}}\!\big(d(t_r)\big)\cdot
+\int_{\mathcal{R}(x_r,t_r)} f_{\mathrm{acc}}(x,\tau)\,dx\,d\tau
+}{
+N_{\mathrm{riders,NYC}}(t_r)\cdot
+\int_{\mathcal{R}(x_r)} f_{\mathrm{riders}}(x)\,dx
+}
+\end{equation}
+\begin{equation}
+=
+\frac{N_{\mathrm{acc,day}}\!\big(d(t_r)\big)}{N_{\mathrm{riders,NYC}}(t_r)}
+\cdot
+\frac{\int_{\mathcal{R}(x_r,t_r)} f_{\mathrm{acc}}(x,\tau)\,dx\,d\tau}
+{\int_{\mathcal{R}(x_r)} f_{\mathrm{riders}}(x)\,dx}
+\end{equation}
+
+Assume that the accident density function will not be time dependent for this duration of the trip (stop integrating over it, multiply with the constant (trip duration) and a representative value).
+\begin{equation}
+\approx
+\frac{N_{\mathrm{acc,day}}\!\big(d(t_r)\big)}{N_{\mathrm{riders,NYC}}(t_r)}
+\cdot
+\frac{\Delta\tau \int_{\mathcal{R}(x_r)} f_{\mathrm{acc}}(x,\bar{\tau}_r)\,dx}
+{\int_{\mathcal{R}(x_r)} f_{\mathrm{riders}}(x)\,dx}
+\end{equation}
+
+Now split $\mathcal{R}(x_r)$ into $n$ regions $\mathcal{R}_1,\dots,\mathcal{R}_n$ of equal size.
+\begin{equation}
+\approx
+\frac{N_{\mathrm{acc,day}}\!\big(d(t_r)\big)}{N_{\mathrm{riders,NYC}}(t_r)}
+\cdot
+\Delta\tau
+\cdot
+\frac{ \sum_{i=1}^{n}\int_{\mathcal{R}_i} f_{\mathrm{acc}}(x,\bar{\tau}_r)\,dx}
+{\sum_{i=1}^{n}\int_{\mathcal{R}_i} f_{\mathrm{riders}}(x)\,dx}
+\end{equation}
+
+Assume that $f_{\mathrm{riders}}$ and $f_{\mathrm{acc}}$ are constant on the regions.
+\begin{equation}
+\approx
+\frac{N_{\mathrm{acc,day}}\!\big(d(t_r)\big)}{N_{\mathrm{riders,NYC}}(t_r)}
+\cdot
+\Delta\tau
+\cdot
+\frac{ \sum_{i=1}^{n} \Delta\mathcal{R}_i\, f_{\mathrm{acc}}(\bar{x}_i,\bar{\tau}_r)}
+{\sum_{i=1}^{n} \Delta\mathcal{R}_i\, f_{\mathrm{riders}}(\bar{x}_i)}
+\end{equation}
+
+By definition, all $\Delta \mathcal{R}_i$ are of equal size.
+\begin{equation}
+\approx
+\frac{N_{\mathrm{acc,day}}\!\big(d(t_r)\big)}{N_{\mathrm{riders,NYC}}(t_r)}
+\cdot
+\Delta\tau
+\cdot
+\frac{ \sum_{i=1}^{n} f_{\mathrm{acc}}(\bar{x}_i,\bar{\tau}_r)}
+{\sum_{i=1}^{n} f_{\mathrm{riders}}(\bar{x}_i)}
+\end{equation}
+
+\section{Final Model}
+The final dynamic risk estimate is:
+\begin{align}
+P(\mathrm{accident} \mid s_{\mathrm{cur}})
+&= \sum_{s_{\mathrm{dest}} \in S \setminus \{s_{\mathrm{cur}}\}}
+P\!\big(r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}} \mid s_{\mathrm{cur}}\big)\,
+P\!\big(\mathrm{accident} \mid r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}}\big) \\
+&= \sum_{s_{\mathrm{dest}} \in S \setminus \{s_{\mathrm{cur}}\}}
+P\!\big(r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}} \mid s_{\mathrm{cur}}\big)
+\cdot
+\frac{N_{\mathrm{acc,day}}\!\big(d(t_r)\big)}{N_{\mathrm{riders,NYC}}(t_r)}
+\cdot
+\Delta\tau
+\cdot
+\frac{ \sum_{i=1}^{n} f_{\mathrm{acc}}(\bar{x}_i,\bar{\tau}_r)}
+{\sum_{i=1}^{n} f_{\mathrm{riders}}(\bar{x}_i)} \\
+&= \Delta\tau
+\cdot
+\frac{N_{\mathrm{acc,day}}\!\big(d(t_r)\big)}{N_{\mathrm{riders,NYC}}(t_r)}
+\cdot
+\sum_{s_{\mathrm{dest}} \in S \setminus \{s_{\mathrm{cur}}\}}
+P\!\big(r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}} \mid s_{\mathrm{cur}}\big)
+\cdot
+\frac{ \sum_{i=1}^{n} f_{\mathrm{acc}}(\bar{x}_i,\bar{\tau}_r)}
+{\sum_{i=1}^{n} f_{\mathrm{riders}}(\bar{x}_i)}.
+\end{align}
+
+\section{Pricing Health Insurance}
+We can directly calculate the insurer's expected cost for a ride starting at $s_{\mathrm{cur}}$:
+\begin{equation}
+\mathbb{E}\!\left[\mathrm{Cost} \mid s_{\mathrm{cur}}\right]
+=
+\mathbb{P}\!\left(\mathrm{acc} \mid s_{\mathrm{cur}}\right)\,
+\mathbb{E}\!\left[\mathrm{Insurance\ Payout} \mid \mathrm{acc}\right].
+\end{equation}
+Adding a premium and we already have the dynamic price for the customer:
+\begin{equation}
+\mathrm{Price} = (1 + \lambda)\,\mathbb{E}\!\left[\mathrm{Cost} \mid s_{\mathrm{cur}}\right].
+\end{equation}
+
+\end{document}

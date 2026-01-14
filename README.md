@@ -35,6 +35,6 @@ Citi Bike operates a bike-sharing system in New York City with over 12,000 bikes
 ## To Do
 
 - MoG for accident density depending on latitude, longitude, and time of day
-- MoG for traffic density
+- MoG for traffic Density depending on latitude and longitude
 - Combine all results to realize the end-to-end dynamic pricing model
 

@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.28 (MiKTeX 25.12) (preloaded format=pdflatex 2026.1.13)  13 JAN 2026 22:11
+This is pdfTeX, Version 3.141592653-2.6-1.40.28 (MiKTeX 25.12) (preloaded format=pdflatex 2026.1.13)  14 JAN 2026 02:39
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -306,7 +306,19 @@ Overfull \hbox (15.02393pt too wide) in paragraph at lines 135--137
 /m/n/10.95 https : / / www . nyc . gov / html / dot / html / bicyclists /
  []
 
-[3] [4] (Risk_Calculation.aux)
+[3]
+Overfull \hbox (30.09848pt too wide) detected at line 236
+[]
+ []
+
+
+Overfull \hbox (19.36021pt too wide) in paragraph at lines 240--241
+[]$\OML/lmm/m/it/10.95 N[] []d\OT1/lmr/m/n/10.95 (\OML/lmm/m/it/10.95 t[]\OT1/l
+mr/m/n/10.95 )[]$\T1/lmr/m/n/10.95 : pre-dicted daily num-ber of ac-ci-dents fr
+om a lin-ear re-gres-sion model (MV_Collision) 
+ []
+
+[4] (Risk_Calculation.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2025-12-24>
@@ -315,7 +327,7 @@ L3 programming layer <2025-12-24>
 Here is how much of TeX's memory you used:
  2873 strings out of 467871
  43031 string characters out of 5418376
- 451285 words of memory out of 5000000
+ 455285 words of memory out of 5000000
  31720 multiletter control sequences out of 15000+600000
  672721 words of font info for 74 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
@@ -335,7 +347,7 @@ ers/felix/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy8.pfb><C:/Use
 rs/felix/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmtt10.pfb><C:/Use
 rs/felix/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/symbols/msbm
 10.pfb>
-Output written on Risk_Calculation.pdf (4 pages, 255930 bytes).
+Output written on Risk_Calculation.pdf (4 pages, 257661 bytes).
 PDF statistics:
  100 PDF objects out of 1000 (max. 8388607)
  0 named destinations out of 1000 (max. 500000)

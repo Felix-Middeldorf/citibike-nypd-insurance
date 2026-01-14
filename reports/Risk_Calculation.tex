@@ -226,7 +226,7 @@ P\!\big(r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}} \mid s_{\mathrm{cur}}\big)
 {\sum_{i=1}^{n} f_{\mathrm{riders}}(\bar{x}_i)} \\
 &= \Delta\tau
 \cdot
-\frac{N_{\mathrm{acc,day}}\!\big(d(t_r)\big)}{N_{\mathrm{riders,NYC}}(t_r)}
+\frac{N_{\mathrm{acc,day}}\!\big(d(t_r)\big)}{N_{\mathrm{citibike\_riders}}(t_{\mathrm{start}})\cdot c_{\mathrm{scaling}}}
 \cdot
 \sum_{s_{\mathrm{dest}} \in S \setminus \{s_{\mathrm{cur}}\}}
 P\!\big(r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}} \mid s_{\mathrm{cur}}\big)
@@ -234,6 +234,18 @@ P\!\big(r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}} \mid s_{\mathrm{cur}}\big)
 \frac{ \sum_{i=1}^{n} f_{\mathrm{acc}}(\bar{x}_i,\bar{\tau}_r)}
 {\sum_{i=1}^{n} f_{\mathrm{riders}}(\bar{x}_i)}.
 \end{align}
+Now we have everything needed to compute this:
+\begin{itemize}
+  \item $\Delta\tau$: average trip duration (02\_Citi\_Bike\_EDA)
+  \item $N_{\mathrm{acc,day}}\!\big(d(t_r)\big)$: predicted daily number of accidents from a linear regression model (MV\_Collision)
+  \item $N_{\mathrm{citibike\_riders}}(t_{\mathrm{start}})$: current number of active rides (citi bike live data feed)
+  \item $P\!\big(r_{s_{\mathrm{cur}}\to s_{\mathrm{dest}}} \mid s_{\mathrm{cur}}\big)$:
+probability that a new trip ends at destination $s_{\mathrm{dest}}$, modelled by logistic regression (\texttt{03\_Citibike\_FE\_Modelling})
+\item $\bar{x}_i$: take them equally spaced from a straight line between $s_{\mathrm{cur}}$ and $s_{\mathrm{dest}}$
+\item $\bar{\tau}_r$: calculate trip start + $1/2$ average trip duration 
+\item $f_{\mathrm{acc}}$: MoG on bike accident data with features lat,long, time of day (to do)
+\item $f_{\mathrm{riders}}$: MoG on citibike trips, from each data point use start and end coordinates (to do)
+\end{itemize}
 
 \section{Pricing Health Insurance}
 We can directly calculate the insurer's expected cost for a ride starting at $s_{\mathrm{cur}}$:
